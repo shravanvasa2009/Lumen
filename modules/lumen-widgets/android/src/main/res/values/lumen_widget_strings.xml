@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fallback copy before the app first publishes, copied from the app's i18n files. -->
+<resources>
+    <string name="lumen_widget_empty_title">No checks yet</string>
+    <string name="lumen_widget_empty_body">Takes 90 seconds</string>
+    <string name="lumen_widget_check_now">Check now</string>
+    <string name="lumen_widget_full_scan">Full Scan</string>
+</resources>

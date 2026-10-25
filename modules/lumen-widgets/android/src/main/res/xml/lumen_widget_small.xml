@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 15+ uses the generated preview instead of previewLayout.
+     https://developer.android.com/develop/ui/views/appwidgets/enhance
+     30 minutes is the shortest refresh Android allows; it keeps "Last check" current.
+     not_keyguard because this widget can show the heart rate.
+     https://android-developers.googleblog.com/2025/03/widgets-on-lock-screen-faq.html -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="none"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:widgetCategory="home_screen|not_keyguard"
+    android:description="@string/lumen_widget_small_description"
+    android:previewLayout="@layout/lumen_widget_preview_small" />

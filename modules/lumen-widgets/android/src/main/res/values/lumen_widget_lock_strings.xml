@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lock-screen widget copy, copied from src/i18n/lockscreen.json. No health details. -->
+<resources>
+    <string name="lumen_widget_lock_description">When you last checked, and Check now. No health details.</string>
+    <string name="lumen_widget_lock_sample_last_check">Last check 2 h ago</string>
+    <string name="lumen_widget_lock_no_checks">No checks yet</string>
+    <string name="lumen_widget_lock_check_now">Check now</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keyguard only, so it is not offered in the home-screen picker. One UI 8 has no AOSP lock-screen hub
+     and lists only Samsung apps there.
+     https://developer.android.com/reference/android/appwidget/AppWidgetProviderInfo#widgetCategory
+     https://android-developers.googleblog.com/2025/03/widgets-on-lock-screen-faq.html -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="80dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:initialKeyguardLayout="@layout/glance_default_loading_layout"
+    android:widgetCategory="keyguard"
+    android:description="@string/lumen_widget_lock_description"
+    android:previewLayout="@layout/lumen_widget_preview_lock" />

@@ -1,0 +1,26 @@
+import { NativeModule, requireOptionalNativeModule } from 'expo';
+
+import type {
+  CameraPermission,
+  Capabilities,
+  CaptureConfig,
+  CaptureStarted,
+  CaptureSummary,
+  LumenCaptureEvents,
+  LumenCaptureModule,
+} from './LumenCapture.types';
+
+declare class LumenCaptureNative extends NativeModule<LumenCaptureEvents> {
+  getCapabilities(): Promise<Capabilities>;
+  getPermission(): Promise<CameraPermission>;
+  requestPermission(): Promise<CameraPermission>;
+  start(config: CaptureConfig): Promise<CaptureStarted>;
+  stop(): Promise<CaptureSummary>;
+  setTorch(level: number): Promise<void>;
+  lockExposure(): Promise<void>;
+}
+
+// The type annotation keeps the native binding in line with LumenCapture.types.ts. null where the module
+// is not linked (Expo Go), so callers can fall back to ReplayCapture.
+export const LumenCapture: LumenCaptureModule | null =
+  requireOptionalNativeModule<LumenCaptureNative>('LumenCapture');

@@ -1,0 +1,180 @@
+import type { TFunction } from 'i18next';
+
+import { evidenceFor } from '@/data/evidence';
+import type { InconclusiveOutcome } from '@/core';
+
+import type { FixtureReading } from '@/features/results/fixtures';
+import { formatClock } from '@/features/results/format';
+
+import {
+  columnHeadings,
+  diabetesFor,
+  diabetesSentence,
+  formatFullDate,
+  inconclusiveLines,
+  measurementLines,
+  pdfPageReadings,
+  qualityNote,
+  reportEvidence,
+  qualityLines,
+  stripsFor,
+  tableRows,
+} from './model';
+import { paper } from './paper';
+import { stripHeight, stripInset, stripPoints, stripWidth } from './stripGeometry';
+
+const entities: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+// Every string that reaches the page goes through here: translations and fixture text are not trusted
+// to be free of markup.
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (character) => entities[character] ?? character);
+}
+
+const stylesheet = `
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: ${paper.text}; background: ${paper.surface}; margin: 24px; font-size: 13px; line-height: 1.45; }
+  h1 { font-size: 20px; margin: 0; color: ${paper.accent}; }
+  header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .banner { color: ${paper.flag}; font-weight: 700; margin: 8px 0; }
+  .demo { display: inline-block; background: ${paper.badgeExperimentalBg}; color: ${paper.badgeExperimentalFg}; font-weight: 700; font-size: 11px; padding: 2px 10px; border-radius: 999px; }
+  .dim { color: ${paper.textDim}; }
+  .note { border: 1px solid ${paper.flag}; background: ${paper.flagBg}; border-radius: 8px; padding: 8px 10px; font-weight: 700; }
+  .line { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid ${paper.line}; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th { background: ${paper.surface2}; text-align: left; font-size: 11px; padding: 6px; }
+  td { font-size: 11px; padding: 6px; border-bottom: 1px solid ${paper.line}; }
+  figure { margin: 8px 0; }
+  figcaption { font-weight: 700; }
+  svg { width: 100%; height: auto; }
+  p { margin: 8px 0; }
+  .page { break-after: page; page-break-after: always; }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+  footer { margin-top: 16px; font-size: 11px; color: ${paper.textDim}; }
+`;
+
+function stripSvg(intervalsMs: readonly number[], color: string, caption: string): string {
+  const dots = stripPoints(intervalsMs);
+  const line = dots.map(({ x, y }) => `${x},${y}`).join(' ');
+  const circles = dots.map(({ x, y }) => `<circle cx="${x}" cy="${y}" r="1.75" fill="${color}"/>`).join('');
+  return (
+    `<svg viewBox="0 0 ${stripWidth} ${stripHeight}" role="img" aria-label="${escapeHtml(caption)}">` +
+    `<line x1="${stripInset}" x2="${stripWidth - stripInset}" y1="${stripHeight / 2}" y2="${stripHeight / 2}" stroke="${paper.line}" stroke-width="1"/>` +
+    `<polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.75" stroke-linejoin="round"/>` +
+    `${circles}</svg>`
+  );
+}
+
+type ReportPdf = {
+  t: TFunction;
+  language: string;
+  reading: FixtureReading;
+  dayReadings: readonly FixtureReading[];
+  demo: boolean;
+};
+
+function pageHtml(
+  { t, language, demo }: Pick<ReportPdf, 't' | 'language' | 'demo'>,
+  page: FixtureReading,
+  diabetes: ReturnType<typeof diabetesFor>,
+): string {
+  const { rhythm, hr } = page.scan.metrics;
+  const flagLines = [
+    rhythm?.flag ? t('report.flagRhythmOne') : null,
+    hr?.flag ? t('report.flagHrOne') : null,
+  ].flatMap((line) =>
+    line === null ? [] : [`<p><b>${escapeHtml(t('report.flagLabel'))}</b> ${escapeHtml(line)}</p>`],
+  );
+  const head = columnHeadings(t)
+    .map((heading) => `<th>${escapeHtml(heading)}</th>`)
+    .join('');
+  const body = tableRows(t, language, [page])
+    .map(({ cells }) => `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+    .join('');
+  const strips = stripsFor(t, language, [page]);
+  const stripFigures = strips.map(
+    ({ caption, intervalsMs, flagged }) =>
+      `<figure><figcaption>${escapeHtml(caption)}</figcaption>${stripSvg(intervalsMs, flagged ? paper.flag : paper.text, caption)}</figure>`,
+  );
+  const notes = [
+    strips.length > 0 ? `<p class="dim">${escapeHtml(t('report.intervalNote'))}</p>` : '',
+    page.synthetic ? `<p class="dim">${escapeHtml(t('demo.synthetic'))}</p>` : '',
+  ];
+
+  return [
+    '<section class="page">',
+    `<header><h1>${escapeHtml(t('report.heading'))}</h1><span class="dim">${escapeHtml(formatFullDate(page.createdAt, language))}</span></header>`,
+    demo ? `<span class="demo">${escapeHtml(t('report.demoMark'))}</span>` : '',
+    `<p class="banner">${escapeHtml(t('prototype.banner'))}</p>`,
+    ...flagLines,
+    `<p class="dim">${escapeHtml([page.mode === 'full' ? t('mode.full') : t('mode.quick'), t('results.cleanSeconds', { seconds: Math.floor(page.scan.cleanSeconds) }), formatClock(page.createdAt, language)].join(' · '))}</p>`,
+    qualityNote(t, page) ? `<p class="note">${escapeHtml(qualityNote(t, page) ?? '')}</p>` : '',
+    ...measurementLines(t, page).map(
+      ({ title, value, note }) =>
+        `<div class="line"><span><b>${escapeHtml(title)}</b><br><span class="dim">${escapeHtml(note)}</span></span><b>${escapeHtml(value)}</b></div>`,
+    ),
+    `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`,
+    ...qualityLines(t, language, [page]).map((line) => `<p class="dim">${escapeHtml(line)}</p>`),
+    diabetes
+      ? `<p><b>${escapeHtml(t('report.diabetesLabel'))}</b> ${escapeHtml(diabetesSentence(t, language, diabetes))}</p>`
+      : '',
+    ...stripFigures,
+    ...notes,
+    `<p class="dim"><b>${escapeHtml(`${t('report.evidence')}:`)}</b> ${escapeHtml(reportEvidence(t, language, diabetes !== null))}</p>`,
+    `<p class="dim"><b>${escapeHtml(t('report.methodLabel'))}</b> ${escapeHtml(t('report.method'))}</p>`,
+    `<p class="dim">${escapeHtml(t('report.leftOut'))}</p>`,
+    `<footer>${escapeHtml(t('report.pdfFooter'))}</footer>`,
+    '</section>',
+  ].join('');
+}
+
+// One page per flagged reading of the day, as HTML for expo-print. Experimental measures have no
+// section; the evidence paragraph comes from evidence.json.
+export function buildReportHtml({ t, language, reading, dayReadings, demo }: ReportPdf): string {
+  // The estimate is a multi-day pattern held on one reading of the day, so it is read from the whole day,
+  // as the card does, and repeated on every page so each printed page stands alone.
+  const diabetes = diabetesFor(dayReadings, evidenceFor('diabetes').measured);
+  const pages = pdfPageReadings(reading, dayReadings).map((page) =>
+    pageHtml({ t, language, demo }, page, diabetes),
+  );
+  return [
+    `<!DOCTYPE html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><title>${escapeHtml(t('report.heading'))}</title><style>${stylesheet}</style></head><body>`,
+    ...pages,
+    '</body></html>',
+  ].join('');
+}
+
+type InconclusivePdf = {
+  t: TFunction;
+  language: string;
+  outcome: InconclusiveOutcome;
+  context: readonly string[];
+  madeAt: Date;
+};
+
+// The report for a refused capture: what was measured and why it fell short, and no health values.
+export function buildInconclusiveReportHtml({
+  t,
+  language,
+  outcome,
+  context,
+  madeAt,
+}: InconclusivePdf): string {
+  const { facts, lost } = inconclusiveLines(t, outcome, context);
+  return [
+    `<!DOCTYPE html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><title>${escapeHtml(t('report.heading'))}</title><style>${stylesheet}</style></head><body><section class="page">`,
+    `<header><h1>${escapeHtml(t('report.heading'))}</h1><span class="dim">${escapeHtml(formatFullDate(madeAt, language))}</span></header>`,
+    `<p class="banner">${escapeHtml(t('prototype.banner'))}</p>`,
+    `<p><b>${escapeHtml(t('result.inconclusive'))}</b></p>`,
+    ...facts.map((fact) => `<p>${escapeHtml(fact)}</p>`),
+    ...lost.map((line) => `<p class="dim">${escapeHtml(line)}</p>`),
+    `<p class="dim"><b>${escapeHtml(t('report.methodLabel'))}</b> ${escapeHtml(t('report.method'))}</p>`,
+    `<footer>${escapeHtml(t('report.pdfFooter'))}</footer>`,
+    '</section></body></html>',
+  ].join('');
+}
