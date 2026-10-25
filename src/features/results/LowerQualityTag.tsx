@@ -1,0 +1,83 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, ScrollView, View } from 'react-native';
+
+import type { QualityReason } from '@/core';
+
+import { AppText } from '@/ui/components/AppText';
+import { BottomSheet } from '@/ui/components/BottomSheet';
+import { Button } from '@/ui/components/Button';
+import { useTheme } from '@/ui/theme';
+
+import { reasonText } from './quality';
+
+type LowerQualitySheetProps = { visible: boolean; reasons: readonly QualityReason[]; onDismiss: () => void };
+
+// Why a reading is lower quality, and how to get a better one.
+export function LowerQualitySheet({ visible, reasons, onDismiss }: LowerQualitySheetProps) {
+  const { t } = useTranslation();
+  const { spacing } = useTheme();
+  return (
+    <BottomSheet
+      visible={visible}
+      onDismiss={onDismiss}
+      dismissLabel={t('common.close')}
+      appearance="grouped"
+    >
+      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: spacing.lg }}>
+        <AppText variant="title" accessibilityRole="header">
+          {t('quality.sheetTitle')}
+        </AppText>
+        <View style={{ gap: spacing.sm }}>
+          {reasons.map((reason) => (
+            <AppText key={reason.kind}>• {reasonText(t, reason)}</AppText>
+          ))}
+        </View>
+        <AppText variant="headline">{t('quality.betterTitle')}</AppText>
+        <View style={{ gap: spacing.sm }}>
+          {[t('quality.tipFlat'), t('quality.tipStill'), t('quality.tipWarm'), t('quality.tipFull')].map(
+            (tip) => (
+              <AppText key={tip} tone="textDim">
+                • {tip}
+              </AppText>
+            ),
+          )}
+        </View>
+      </ScrollView>
+      <Button label={t('common.gotIt')} variant="tint" onPress={onDismiss} />
+    </BottomSheet>
+  );
+}
+
+type LowerQualityTagProps = { reasons: readonly QualityReason[]; small?: boolean };
+
+// A reading is never withheld for quality; this quiet tag says it was weaker and the sheet says why.
+// Never red.
+export function LowerQualityTag({ reasons, small = false }: LowerQualityTagProps) {
+  const { t } = useTranslation();
+  const { colors, radius, spacing } = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('quality.chip')}
+        accessibilityHint={t('quality.chipHint')}
+        hitSlop={spacing.md}
+        onPress={() => setOpen(true)}
+        style={{
+          alignSelf: 'flex-start',
+          backgroundColor: colors.badgeFlagBg,
+          borderRadius: radius.pill,
+          paddingHorizontal: small ? spacing.sm : spacing.md,
+          paddingVertical: small ? 0 : spacing.xs - 1,
+        }}
+      >
+        <AppText variant="caption" style={{ color: colors.badgeFlagFg, fontWeight: small ? '400' : '600' }}>
+          {t('quality.chip')} ›
+        </AppText>
+      </Pressable>
+      <LowerQualitySheet visible={open} reasons={reasons} onDismiss={() => setOpen(false)} />
+    </>
+  );
+}

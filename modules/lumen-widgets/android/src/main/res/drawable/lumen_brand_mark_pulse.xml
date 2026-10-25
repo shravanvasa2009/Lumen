@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VectorDrawable has no masks, so the pulse line is drawn over the body in the surface color. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="88dp"
+    android:height="172dp"
+    android:viewportWidth="88"
+    android:viewportHeight="172">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="10"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M0,102 H24 L38,62 L54,136 L66,102 H88" />
+</vector>

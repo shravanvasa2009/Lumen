@@ -1,0 +1,201 @@
+package expo.modules.lumencapture
+
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
+import android.os.Build
+import kotlin.math.sqrt
+
+data class FpsRange(val lower: Int, val upper: Int)
+
+data class ManualExposureRange(val minDurationNs: Long, val maxDurationNs: Long, val minIso: Int, val maxIso: Int)
+
+// cameraId is what CameraX opens; physicalId is set for a lens behind a logical multi-camera.
+data class RearLens(
+    val id: String,
+    val cameraId: String,
+    val physicalId: String?,
+    val kind: String,
+    val fpsRanges: List<FpsRange>,
+    val torchUsable: Boolean,
+    val torchLevels: Boolean,
+    val exposureLock: Boolean,
+    val whiteBalanceLock: Boolean,
+    val focusLock: Boolean,
+    val fixedFocus: Boolean,
+    // Diopters; null where the device does not report it.
+    val minimumFocusDistance: Float?,
+    // Set with MANUAL_SENSOR; exposure steering needs it.
+    val manualExposure: ManualExposureRange?,
+    // null where the lens has no exposure compensation.
+    val aeCompensation: AeCompensation?,
+    val realtimeTimestamps: Boolean,
+    // INFO_SUPPORTED_HARDWARE_LEVEL; null where the key is missing.
+    val hardwareLevel: Int?,
+) {
+    val maxFps: Int
+        get() = fpsRanges.maxOfOrNull { it.upper }?.coerceAtMost(MAX_FPS) ?: 0
+
+    val exposureHold: ExposureHold
+        get() = exposureHold(manualExposure != null, exposureLock)
+}
+
+private const val MAX_FPS = 240
+
+// 35 mm-equivalent cut points. Main cameras sit near 24 to 28 mm, ultra-wides near 13 to 16 mm,
+// telephotos at 48 mm or longer.
+private const val ULTRAWIDE_BELOW_MM = 20.0
+private const val TELE_ABOVE_MM = 35.0
+private const val FULL_FRAME_DIAGONAL_MM = 43.27
+
+fun lensKind(focalLengthMm: Float?, sensorWidthMm: Float?, sensorHeightMm: Float?): String {
+    if (focalLengthMm == null || sensorWidthMm == null || sensorHeightMm == null) return "unknown"
+    val diagonal = sqrt(sensorWidthMm.toDouble() * sensorWidthMm + sensorHeightMm.toDouble() * sensorHeightMm)
+    if (diagonal <= 0.0 || focalLengthMm <= 0f) return "unknown"
+    val equivalentMm = focalLengthMm * FULL_FRAME_DIAGONAL_MM / diagonal
+    return when {
+        equivalentMm < ULTRAWIDE_BELOW_MM -> "ultrawide"
+        equivalentMm > TELE_ABOVE_MM -> "tele"
+        else -> "wide"
+    }
+}
+
+// Highest rate up to the requested one. On ties the highest floor wins, so AE can slow down least.
+fun pickFpsRange(ranges: List<FpsRange>, wantFps: Int): FpsRange? {
+    val allowed = ranges.filter { it.upper <= wantFps }
+    if (allowed.isEmpty()) return ranges.minWithOrNull(compareBy<FpsRange> { it.upper }.thenByDescending { it.lower })
+    return allowed.maxWithOrNull(compareBy<FpsRange> { it.upper }.thenBy { it.lower })
+}
+
+// A minimum focus distance of 0 means fixed focus (Camera2 docs). null alone is not fixed, since LEGACY
+// devices may omit the key.
+fun isFixedFocus(afModes: IntArray, minimumFocusDistance: Float?): Boolean =
+    minimumFocusDistance == 0f || (afModes.isNotEmpty() && afModes.all { it == CameraMetadata.CONTROL_AF_MODE_OFF })
+
+// Focus is held with AF OFF and a LENS_FOCUS_DISTANCE, so claim the lock only where a distance can be set.
+// LEGACY devices may ignore manual focus (INFO_SUPPORTED_HARDWARE_LEVEL docs).
+fun focusHolds(afModes: IntArray, fixedFocus: Boolean, minimumFocusDistance: Float?, hardwareLevel: Int?): Boolean =
+    fixedFocus ||
+        (
+            CameraMetadata.CONTROL_AF_MODE_OFF in afModes &&
+                minimumFocusDistance != null &&
+                minimumFocusDistance > 0f &&
+                hardwareLevel != null &&
+                hardwareLevel != CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY
+        )
+
+// A range of [0, 0] means no exposure compensation (CameraCharacteristics docs).
+fun aeCompensation(minIndex: Int?, maxIndex: Int?, stepEv: Double?): AeCompensation? {
+    if (minIndex == null || maxIndex == null || stepEv == null || stepEv <= 0.0 || minIndex >= maxIndex) return null
+    return AeCompensation(minIndex, maxIndex, stepEv)
+}
+
+// For the release-build camera log.
+fun hardwareLevelName(level: Int?): String =
+    when (level) {
+        null -> "unknown"
+        CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY -> "LEGACY"
+        CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED -> "LIMITED"
+        CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_FULL -> "FULL"
+        CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_3 -> "LEVEL_3"
+        CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL -> "EXTERNAL"
+        else -> "level $level"
+    }
+
+// Ids are "<cameraId>", or "<cameraId>:<physicalId>" for a lens behind a logical camera. Only physical lenses
+// are listed.
+fun rearLenses(manager: CameraManager): List<RearLens> {
+    val listed = manager.cameraIdList.toSet()
+    return manager.cameraIdList.flatMap { cameraId ->
+        val logical = manager.getCameraCharacteristics(cameraId)
+        if (logical.get(CameraCharacteristics.LENS_FACING) != CameraMetadata.LENS_FACING_BACK) return@flatMap emptyList()
+        val capabilities = logical.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
+        // CameraX opens only cameras that support the standard capture pipeline.
+        if (CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE !in capabilities) {
+            return@flatMap emptyList()
+        }
+        val hidden = hiddenPhysicalIds(logical, capabilities, listed)
+        when {
+            hidden.isNotEmpty() ->
+                hidden.map { physicalId ->
+                    describe("$cameraId:$physicalId", cameraId, physicalId, logical, manager.getCameraCharacteristics(physicalId))
+                }
+            isLogicalCamera(capabilities) && logical.physicalIdsOrEmpty().isNotEmpty() -> emptyList()
+            else -> listOf(describe(cameraId, cameraId, null, logical, logical))
+        }
+    }
+}
+
+private fun isLogicalCamera(capabilities: IntArray): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+        CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA in capabilities
+
+private fun CameraCharacteristics.physicalIdsOrEmpty(): Set<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) physicalCameraIds else emptySet()
+
+// Physical lenses the OS does not list on their own.
+private fun hiddenPhysicalIds(
+    logical: CameraCharacteristics,
+    capabilities: IntArray,
+    listed: Set<String>,
+): List<String> {
+    if (!isLogicalCamera(capabilities)) return emptyList()
+    return logical.physicalIdsOrEmpty().filter { it !in listed }.sorted()
+}
+
+// Requests go to the logical camera, so capabilities come from it; focal length and sensor size come from
+// the physical lens.
+private fun describe(
+    id: String,
+    cameraId: String,
+    physicalId: String?,
+    logical: CameraCharacteristics,
+    lens: CameraCharacteristics,
+): RearLens {
+    val focal = lens.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull()
+    val sensor = lens.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+    val afModes = logical.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES) ?: IntArray(0)
+    val minimumFocusDistance = logical.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+    val fixedFocus = isFixedFocus(afModes, minimumFocusDistance)
+    val hardwareLevel = logical.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
+    val strengthLevels =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            logical.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) ?: 1
+        } else {
+            1
+        }
+    val capabilities = logical.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
+    val durations = logical.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+    val isoRange = logical.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
+    val manual =
+        if (CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR in capabilities && durations != null && isoRange != null) {
+            ManualExposureRange(durations.lower, durations.upper, isoRange.lower, isoRange.upper)
+        } else {
+            null
+        }
+    val compensationRange = logical.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+    val compensationStep = logical.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+    return RearLens(
+        id = id,
+        cameraId = cameraId,
+        physicalId = physicalId,
+        kind = lensKind(focal, sensor?.width, sensor?.height),
+        fpsRanges =
+            logical.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+                ?.map { FpsRange(it.lower, it.upper) }
+                .orEmpty(),
+        torchUsable = logical.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
+        torchLevels = strengthLevels > 1,
+        exposureLock = logical.get(CameraCharacteristics.CONTROL_AE_LOCK_AVAILABLE) == true,
+        whiteBalanceLock = logical.get(CameraCharacteristics.CONTROL_AWB_LOCK_AVAILABLE) == true,
+        focusLock = focusHolds(afModes, fixedFocus, minimumFocusDistance, hardwareLevel),
+        fixedFocus = fixedFocus,
+        minimumFocusDistance = minimumFocusDistance,
+        manualExposure = manual,
+        aeCompensation = aeCompensation(compensationRange?.lower, compensationRange?.upper, compensationStep?.toDouble()),
+        realtimeTimestamps =
+            logical.get(CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE) ==
+                CameraMetadata.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME,
+        hardwareLevel = hardwareLevel,
+    )
+}

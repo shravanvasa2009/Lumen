@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand mark body with the lens hole. Viewport cropped to the body (x 56-144, y 14-186 of 200). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="88dp"
+    android:height="172dp"
+    android:viewportWidth="88"
+    android:viewportHeight="172">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M24,0 H64 A24,24 0 0 1 88,24 V148 A24,24 0 0 1 64,172 H24 A24,24 0 0 1 0,148 V24 A24,24 0 0 1 24,0 Z M19,26 A7,7 0 1 0 33,26 A7,7 0 1 0 19,26 Z" />
+</vector>

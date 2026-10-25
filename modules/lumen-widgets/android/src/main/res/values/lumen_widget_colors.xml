@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fallback palette before the app first publishes, copied from src/theme/tokens.json. -->
+<resources>
+    <color name="lumen_widget_light_surface">#FFFFFF</color>
+    <color name="lumen_widget_light_text">#000000</color>
+    <color name="lumen_widget_light_text_dim">#636366</color>
+    <color name="lumen_widget_light_accent">#096F67</color>
+    <color name="lumen_widget_light_ring_track">#E5E5EA</color>
+    <color name="lumen_widget_light_button_fill">#0B7A70</color>
+    <color name="lumen_widget_light_on_button_fill">#FFFFFF</color>
+    <color name="lumen_widget_light_tonal_fill">#E8F5F3</color>
+    <color name="lumen_widget_light_on_tonal_fill">#096F67</color>
+    <color name="lumen_widget_light_flag">#985200</color>
+    <color name="lumen_widget_light_critical_text">#D70015</color>
+    <color name="lumen_widget_dark_surface">#1C1C1E</color>
+    <color name="lumen_widget_dark_text">#F5F5F7</color>
+    <color name="lumen_widget_dark_text_dim">#AEAEB2</color>
+    <color name="lumen_widget_dark_accent">#2EC4B6</color>
+    <color name="lumen_widget_dark_ring_track">#3A3A3C</color>
+    <color name="lumen_widget_dark_button_fill">#0B7A70</color>
+    <color name="lumen_widget_dark_on_button_fill">#FFFFFF</color>
+    <color name="lumen_widget_dark_tonal_fill">#0E2E2B</color>
+    <color name="lumen_widget_dark_on_tonal_fill">#2EC4B6</color>
+    <color name="lumen_widget_dark_flag">#FFB340</color>
+    <color name="lumen_widget_dark_critical_text">#FF6961</color>
+</resources>

@@ -1,0 +1,37 @@
+// Glance needs the Compose compiler plugin at React Native's Kotlin version, set up as @expo/ui does.
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath("org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:${kotlinVersion}")
+  }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+group = 'expo.modules.lumenwidgets'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.lumenwidgets"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  buildFeatures {
+    compose true
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Builds on Compose runtime 1.7.8 and kotlin-stdlib 2.0.21, which React Native's Kotlin 2.1.20 accepts.
+  implementation 'androidx.glance:glance-appwidget:1.2.0'
+  // For NotificationCompat; Glance brings core-ktx only at runtime.
+  implementation 'androidx.core:core-ktx:1.13.1'
+}

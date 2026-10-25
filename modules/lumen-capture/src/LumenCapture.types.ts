@@ -1,0 +1,102 @@
+// One frame; r, g, b are means over the finger region, 0..1.
+export interface Sample {
+  tNs: number;
+  r: number;
+  g: number;
+  b: number;
+}
+export interface FrameStat {
+  tNs: number;
+  spatialStdR: number;
+  clipFrac: number;
+  exposureNs: number; // exposure duration of this frame
+}
+// Emitted every 100 ms.
+export interface SampleBatch {
+  samples: Sample[];
+  stats: FrameStat[];
+}
+
+// Emitted at 4 Hz.
+export interface CaptureStatus {
+  fingerCovered: boolean;
+  motionRms: number;
+  thermal: 'nominal' | 'fair' | 'serious' | 'critical';
+  fps: number; // frames received over the last 1 s
+  droppedFrac: number; // dropped / (received + dropped) since start()
+}
+export interface LensInfo {
+  id: string;
+  kind: 'wide' | 'ultrawide' | 'tele' | 'unknown';
+  maxFps: number;
+  torchUsable: boolean;
+}
+export interface Capabilities {
+  platform: 'ios' | 'android';
+  modelId: string;
+  osVersion: string;
+  rearLenses: LensInfo[];
+  torch: { available: boolean; levels: boolean };
+  locks: { exposure: boolean; whiteBalance: boolean; focus: boolean };
+}
+export interface CaptureConfig {
+  lensId?: string;
+  targetFps?: number;
+  torchLevel?: number; // 0 = off (ambient mode), 0..1
+  exposureTarget?: [number, number]; // red-mean window, default [0.55, 0.80]
+}
+// activeFps can be lower than targetFps. iOS reads it back from the device; Android reports the top of the
+// requested range, which a variable range can run below; Replay reports the recording's rate.
+export interface CaptureStarted {
+  activeFps: number;
+}
+export interface CaptureSummary {
+  startedNs: number;
+  stoppedNs: number;
+  lensId?: string;
+  frames: number;
+  dropped: number;
+}
+// Same shape as Expo's PermissionResponse, so screens can treat it like any Expo permission.
+export interface CameraPermission {
+  status: 'granted' | 'undetermined' | 'denied';
+  expires: 'never' | number;
+  granted: boolean;
+  canAskAgain: boolean;
+}
+
+// Development builds only, at 1 Hz for Lab mode.
+export interface LabDiagnostics {
+  lensId: string;
+  formatWidth: number;
+  formatHeight: number;
+  targetFps: number;
+  frameWorkMsMean: number; // native per-frame reduction time; budget < 4 ms at 60 fps
+  frameWorkMsMax: number;
+  iso: number;
+  exposureNs: number;
+  torchOn: boolean;
+  torchLevel: number;
+  locked: { exposure: boolean; whiteBalance: boolean; focus: boolean };
+}
+
+// Event name to payload.
+export type LumenCaptureEvents = {
+  samples: (b: SampleBatch) => void;
+  status: (s: CaptureStatus) => void;
+  lab: (d: LabDiagnostics) => void;
+};
+
+export interface LumenCaptureModule {
+  getCapabilities(): Promise<Capabilities>;
+  getPermission(): Promise<CameraPermission>;
+  requestPermission(): Promise<CameraPermission>;
+  start(config: CaptureConfig): Promise<CaptureStarted>;
+  stop(): Promise<CaptureSummary>;
+  setTorch(level: number): Promise<void>;
+  // Locks exposure, white balance, and focus together.
+  lockExposure(): Promise<void>;
+  addListener(e: 'samples', cb: (b: SampleBatch) => void): { remove(): void };
+  addListener(e: 'status', cb: (s: CaptureStatus) => void): { remove(): void };
+  addListener(e: 'lab', cb: (d: LabDiagnostics) => void): { remove(): void };
+}

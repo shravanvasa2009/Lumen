@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker descriptions (Android 12+) and the preview's sample reading. No brand name, so a rename needs
+     no change here. -->
+<resources>
+    <string name="lumen_widget_small_description">Your last check and a one-tap Check now</string>
+    <string name="lumen_widget_medium_description">Heart rate, Check now and Full Scan</string>
+    <string name="lumen_widget_sample_status">Up to date</string>
+    <string name="lumen_widget_sample_last_check">Last check 2 h ago</string>
+    <string name="lumen_widget_sample_bpm">64</string>
+    <string name="lumen_widget_sample_bpm_unit">bpm</string>
+</resources>

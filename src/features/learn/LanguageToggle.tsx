@@ -1,0 +1,59 @@
+import { useTranslation } from 'react-i18next';
+import { StyleSheet, View } from 'react-native';
+
+import { AppText } from '@/ui/components/AppText';
+import { PressableScale } from '@/ui/components/PressableScale';
+import { useTheme } from '@/ui/theme';
+
+// Session only; the Settings language row owns the saved choice.
+export function LanguageToggle() {
+  const { t, i18n } = useTranslation();
+  const { colors, radius, spacing, control } = useTheme();
+  const choices = [
+    { code: 'en', short: t('learn.langEn'), name: t('learn.langEnglish') },
+    { code: 'es', short: t('learn.langEs'), name: t('learn.langSpanish') },
+  ];
+  return (
+    <View
+      accessibilityRole="radiogroup"
+      style={[
+        styles.group,
+        {
+          backgroundColor: colors.surface2,
+          borderColor: colors.line,
+          borderRadius: radius.card,
+          padding: spacing.xs,
+        },
+      ]}
+    >
+      {choices.map(({ code, short, name }) => {
+        const selected = i18n.language === code;
+        return (
+          <PressableScale
+            key={code}
+            accessibilityRole="radio"
+            accessibilityLabel={name}
+            accessibilityState={{ checked: selected }}
+            onPress={() => void i18n.changeLanguage(code)}
+            style={[
+              styles.choice,
+              {
+                minHeight: control.minTarget - spacing.sm,
+                paddingHorizontal: spacing.lg,
+                borderRadius: radius.card - spacing.xs,
+                backgroundColor: selected ? colors.surface3 : 'transparent',
+              },
+            ]}
+          >
+            <AppText tone={selected ? 'text' : 'textDim'}>{short}</AppText>
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  group: { flexDirection: 'row', borderWidth: 1 },
+  choice: { alignItems: 'center', justifyContent: 'center' },
+});

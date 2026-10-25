@@ -1,0 +1,14 @@
+// A rate under one percent reads "<1%" so a small but real rate is never shown as zero.
+export function formatPercent(fraction: number, language: string): string {
+  const format = new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 0 });
+  return fraction > 0 && fraction < 0.005 ? `<${format.format(0.01)}` : format.format(fraction);
+}
+
+// A calendar date, read in UTC so the day is the same in every time zone.
+export function formatDate(isoDate: string, language: string): string | null {
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
+    parsed,
+  );
+}

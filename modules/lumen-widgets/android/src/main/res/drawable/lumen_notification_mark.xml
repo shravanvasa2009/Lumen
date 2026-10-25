@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small icons use only the alpha channel, so the lens and pulse line must be transparent. One even-odd
+     path cuts them out of the body, since VectorDrawable has no masks.
+     https://developer.android.com/develop/ui/views/notifications#icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M80,14 H120 A24,24 0 0 1 144,38 V162 A24,24 0 0 1 120,186 H80 A24,24 0 0 1 56,162 V38 A24,24 0 0 1 80,14 Z M75,40 A7,7 0 1 0 89,40 A7,7 0 1 0 75,40 Z M56,121 L80,121 A5,5 0 0 0 84.72,117.65 L92.86,94.39 L105.11,151.06 A5,5 0 0 0 114.71,151.66 L125.54,121 L144,121 L144,111 L122,111 A5,5 0 0 0 117.29,114.34 L111.16,131.7 L98.89,74.94 A5,5 0 0 0 89.28,74.35 L76.45,111 L56,111 Z" />
+</vector>
